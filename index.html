@@ -75,7 +75,7 @@
             </div>
           </div>
 
-          <div class="control-group" data-collapsible>
+          <div class="control-group" data-collapsible data-default-collapsed>
             <div class="control-group__header">
               <div>
                 <h3>Layer Configuration</h3>
@@ -87,22 +87,19 @@
             </div>
 
             <div id="layerConfigurationSectionBody" class="control-group__body">
-              <label class="field">
-                <span>Active Layers</span>
-                <select id="layerCount">
-                  <option value="1" selected>1 Layer</option>
-                  <option value="2">2 Layers</option>
-                  <option value="3">3 Layers</option>
-                  <option value="4">4 Layers</option>
-                </select>
-              </label>
+              <div class="layer-actions">
+                <p class="helper-text">Start with one default layer, then add more layers as needed for extra pen/color passes.</p>
+              </div>
 
               <div id="layerRows" class="layer-rows"></div>
               <p id="layerSummary" class="helper-text"></p>
+              <div class="layer-actions layer-actions--footer">
+                <button id="addLayerBtn" class="layer-actions__add" type="button">Add Layer</button>
+              </div>
             </div>
           </div>
 
-          <div class="control-group" data-collapsible>
+          <div class="control-group" data-collapsible data-default-collapsed>
             <div class="control-group__header">
               <div>
                 <h3>Tonal Mapping</h3>
@@ -152,7 +149,7 @@
             </div>
           </div>
 
-          <div class="control-group" data-collapsible>
+          <div class="control-group" data-collapsible data-default-collapsed>
             <div class="control-group__header">
               <div>
                 <h3>Geometry Density</h3>
@@ -178,7 +175,7 @@
             </div>
           </div>
 
-          <div class="control-group" data-collapsible>
+          <div class="control-group" data-collapsible data-default-collapsed>
             <div class="control-group__header">
               <div>
                 <h3>Shape Language</h3>
@@ -195,6 +192,12 @@
                 <p class="helper-text"><strong>Intensity Bands:</strong> switches shape based on whether an area is dark, midtone, or light.</p>
                 <p class="helper-text"><strong>Seeded Random:</strong> mixes enabled shapes in a repeatable random pattern.</p>
               </div>
+
+              <label class="field">
+                <span>Mood</span>
+                <select id="moodSelect" data-default-mood="technical"></select>
+                <span id="moodDetails" class="helper-text">Choose a visual family of shapes, then fine-tune individual shape choices below.</span>
+              </label>
 
               <div class="field-row">
                 <label class="field">
@@ -216,7 +219,7 @@
               <fieldset class="field section-fieldset control-visibility" data-visible-when="style:random">
                 <legend>Available Shapes</legend>
                 <div id="availableShapes" class="check-grid"></div>
-                <p class="helper-text">Choose which shapes can appear when using Seeded Random mode.</p>
+                <p class="helper-text">Mood presets these checkboxes; you can still refine the final mix manually.</p>
               </fieldset>
 
               <div class="field-row control-visibility" data-visible-when="style:single">

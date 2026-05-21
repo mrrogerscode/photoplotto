@@ -10,16 +10,17 @@ Canonical repository: <https://github.com/mrrogerscode/photoplotto.git>
 
 1. Accept user images and convert them into one or more plotter-ready SVG layers.
 2. Let users configure one to four ordered layers, each with its own pen profile and color.
-3. Render SVG using selectable forms: square, circle, hexagon.
+3. Render SVG using selectable forms including square, circle, hexagon, triangle, diamond, ring, plus, line, and octagon.
 4. Let users choose intensity mapping behavior:
    - Density
    - Stroke
    - Hybrid
-5. Support A4/Letter page presets and configurable margins.
-6. Produce deterministic output using a seed.
-7. Keep output plotter-friendly by default.
-8. Run by opening [index.html](../index.html) directly from disk after cloning the repo.
-9. Run unchanged when hosted on GitHub Pages.
+5. Support shape-language mood presets that seed curated families of forms.
+6. Support A4/Letter page presets and configurable margins.
+7. Produce deterministic output using a seed.
+8. Keep output plotter-friendly by default.
+9. Run by opening [index.html](../index.html) directly from disk after cloning the repo.
+10. Run unchanged when hosted on GitHub Pages.
 
 ## 3. Non-Goals
 
@@ -74,6 +75,12 @@ Canonical repository: <https://github.com/mrrogerscode/photoplotto.git>
 1. Single-shape mode.
 2. Intensity-band mode (dark/mid/light selectors).
 3. Seeded-random shape mode from enabled shapes.
+
+### 5.5.1 Shape Moods
+
+1. Provide named mood presets for curated shape families.
+2. Applying a mood must update the available random-shape checklist and recommended single/banded shape defaults.
+3. Users must be able to fine-tune shape choices after applying a mood.
 
 ### 5.6 Mapping Modes
 

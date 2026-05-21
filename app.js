@@ -20,9 +20,11 @@ const invertInput = document.getElementById("invert");
 const gammaInput = document.getElementById("gamma");
 const contrastInput = document.getElementById("contrast");
 const densityStrengthInput = document.getElementById("densityStrength");
-const layerCountInput = document.getElementById("layerCount");
+const addLayerBtn = document.getElementById("addLayerBtn");
 const layerRowsEl = document.getElementById("layerRows");
 const layerSummaryEl = document.getElementById("layerSummary");
+const moodInput = document.getElementById("moodSelect");
+const moodDetailsEl = document.getElementById("moodDetails");
 const singleShapeInput = document.getElementById("singleShape");
 const seedInput = document.getElementById("seed");
 const bandDarkInput = document.getElementById("bandDark");
@@ -41,12 +43,15 @@ const rangeInputs = [...document.querySelectorAll('input[type="range"][data-valu
 const collapsibleGroups = [...document.querySelectorAll(".control-group[data-collapsible]")];
 const shapeRegistry = Array.isArray(window.PhotoPlottoShapes) ? window.PhotoPlottoShapes : [];
 const shapeMap = new Map(shapeRegistry.map((shape) => [shape.id, shape]));
+const moodRegistry = Array.isArray(window.PhotoPlottoShapeMoods) ? window.PhotoPlottoShapeMoods : [];
+const moodMap = new Map(moodRegistry.map((mood) => [mood.id, mood]));
 const toolRegistry = Array.isArray(window.PhotoPlottoTools) ? window.PhotoPlottoTools : [];
 const toolMap = new Map(toolRegistry.map((tool) => [tool.id, tool]));
 
 let loadedImageBitmap = null;
 let workingImageData = null;
 let lastRender = null;
+let activeLayerCount = 1;
 
 initializeShapeControls();
 initializeLayerControls();
@@ -81,6 +86,11 @@ imageInput.addEventListener("change", async (event) => {
     if (control instanceof HTMLInputElement && control.type === "range") {
       updateRangeValueDisplay(control);
     }
+    if (control === moodInput) {
+      applyMoodPreset(control.value);
+    } else if (isShapeMoodTuningControl(control)) {
+      setMoodSelection("custom");
+    }
     syncControlVisibility();
     updateLayerRowsState();
     updateLayerConfigurationSummary();
@@ -94,6 +104,25 @@ imageInput.addEventListener("change", async (event) => {
 syncControlVisibility();
 updateLayerRowsState();
 updateLayerConfigurationSummary();
+
+addLayerBtn.addEventListener("click", () => {
+  setActiveLayerCount(activeLayerCount + 1);
+});
+
+layerRowsEl.addEventListener("click", (event) => {
+  const button = event.target.closest(".layer-row__remove");
+  if (!button) {
+    return;
+  }
+
+  const row = button.closest(".layer-row");
+  const index = Number(row?.dataset.layerIndex);
+  if (!Number.isFinite(index) || index >= activeLayerCount || activeLayerCount <= 1) {
+    return;
+  }
+
+  removeLayerAt(index);
+});
 
 renderBtn.addEventListener("click", () => {
   renderPipeline();
@@ -125,7 +154,7 @@ function initializeCollapsibleControls() {
       setControlGroupCollapsed(group, body, button, !group.classList.contains("is-collapsed"));
     });
 
-    setControlGroupCollapsed(group, body, button, false);
+    setControlGroupCollapsed(group, body, button, group.hasAttribute("data-default-collapsed"));
   }
 }
 
@@ -162,11 +191,13 @@ function initializeShapeControls() {
     throw new Error("PhotoPlottoShapes registry is empty.");
   }
 
+  populateMoodSelect();
   renderAvailableShapes();
   populateShapeSelect(singleShapeInput);
   populateShapeSelect(bandDarkInput);
   populateShapeSelect(bandMidInput);
   populateShapeSelect(bandLightInput);
+  applyMoodPreset(resolveMoodId(moodInput?.dataset.defaultMood));
 }
 
 function initializeLayerControls() {
@@ -178,6 +209,8 @@ function initializeLayerControls() {
   for (let index = 0; index < MAX_LAYER_COUNT; index += 1) {
     layerRowsEl.append(createLayerRow(index));
   }
+
+  setActiveLayerCount(1);
 }
 
 function createLayerRow(index) {
@@ -188,11 +221,19 @@ function createLayerRow(index) {
   const header = document.createElement("div");
   header.className = "layer-row__header";
 
+  const titleGroup = document.createElement("div");
+  titleGroup.className = "layer-row__title";
   const title = document.createElement("strong");
   title.textContent = `Layer ${index + 1}`;
   const swatch = document.createElement("span");
   swatch.className = "layer-row__swatch";
-  header.append(title, swatch);
+  titleGroup.append(title, swatch);
+
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "layer-row__remove";
+  removeBtn.type = "button";
+  removeBtn.textContent = "Remove";
+  header.append(titleGroup, removeBtn);
 
   const fieldRow = document.createElement("div");
   fieldRow.className = "field-row";
@@ -222,7 +263,7 @@ function createLayerRow(index) {
   details.className = "helper-text layer-row__details";
 
   row.append(header, fieldRow, details);
-  updateLayerRowPresentation(row, index < Number(layerCountInput.value || 1));
+  updateLayerRowPresentation(row, index < activeLayerCount);
   return row;
 }
 
@@ -239,27 +280,64 @@ function populateToolSelect(selectEl, defaultToolId) {
 }
 
 function updateLayerRowsState() {
-  const activeCount = clampLayerCount(layerCountInput.value);
   const rows = [...layerRowsEl.querySelectorAll(".layer-row")];
   for (const row of rows) {
     const index = Number(row.dataset.layerIndex);
-    updateLayerRowPresentation(row, index < activeCount);
+    updateLayerRowPresentation(row, index < activeLayerCount, index);
   }
+
+  addLayerBtn.disabled = activeLayerCount >= MAX_LAYER_COUNT;
 }
 
-function updateLayerRowPresentation(row, isActive) {
+function updateLayerRowPresentation(row, isActive, index = Number(row.dataset.layerIndex)) {
   row.hidden = !isActive;
   if (!isActive) {
     return;
   }
 
+  const title = row.querySelector("strong");
   const colorInput = row.querySelector(".layer-color");
   const toolSelect = row.querySelector(".layer-tool");
   const swatch = row.querySelector(".layer-row__swatch");
   const details = row.querySelector(".layer-row__details");
+  const removeBtn = row.querySelector(".layer-row__remove");
   const tool = getToolProfile(toolSelect.value);
+  title.textContent = `Layer ${index + 1}`;
   swatch.style.backgroundColor = colorInput.value;
+  removeBtn.hidden = index === 0;
   details.textContent = `${tool.label}. Single-pass line width ${fmt(tool.minStrokeMm)}-${fmt(tool.maxStrokeMm)}mm. Recommended cell size ${fmt(tool.recommendedCellSizeMm)}mm.`;
+}
+
+function setActiveLayerCount(nextCount) {
+  activeLayerCount = clampLayerCount(nextCount);
+  updateLayerRowsState();
+  updateLayerConfigurationSummary();
+  if (loadedImageBitmap) {
+    renderPipeline();
+  }
+}
+
+function removeLayerAt(index) {
+  if (activeLayerCount <= 1 || index <= 0 || index >= activeLayerCount) {
+    return;
+  }
+
+  const rows = [...layerRowsEl.querySelectorAll(".layer-row")];
+  for (let current = index; current < activeLayerCount - 1; current += 1) {
+    const sourceRow = rows[current + 1];
+    const targetRow = rows[current];
+    targetRow.querySelector(".layer-color").value = sourceRow.querySelector(".layer-color").value;
+    targetRow.querySelector(".layer-tool").value = sourceRow.querySelector(".layer-tool").value;
+  }
+
+  applyLayerRowDefaults(rows[activeLayerCount - 1], activeLayerCount - 1);
+
+  setActiveLayerCount(activeLayerCount - 1);
+}
+
+function applyLayerRowDefaults(row, index) {
+  row.querySelector(".layer-color").value = DEFAULT_LAYER_COLORS[index] || DEFAULT_LAYER_COLORS[0];
+  row.querySelector(".layer-tool").value = getDefaultToolId();
 }
 
 function renderAvailableShapes() {
@@ -278,6 +356,26 @@ function renderAvailableShapes() {
   }
 }
 
+function populateMoodSelect() {
+  if (!moodInput) {
+    return;
+  }
+
+  moodInput.innerHTML = "";
+
+  for (const mood of moodRegistry) {
+    const option = document.createElement("option");
+    option.value = mood.id;
+    option.textContent = mood.label;
+    moodInput.append(option);
+  }
+
+  const customOption = document.createElement("option");
+  customOption.value = "custom";
+  customOption.textContent = "Custom";
+  moodInput.append(customOption);
+}
+
 function populateShapeSelect(selectEl) {
   const defaultShape = resolveShapeId(selectEl.dataset.defaultShape);
   selectEl.innerHTML = "";
@@ -289,6 +387,50 @@ function populateShapeSelect(selectEl) {
     option.selected = shape.id === defaultShape;
     selectEl.append(option);
   }
+}
+
+function applyMoodPreset(moodId) {
+  const mood = moodMap.get(resolveMoodId(moodId));
+  if (!mood) {
+    setMoodSelection("custom");
+    return;
+  }
+
+  const enabledShapeIds = new Set(mood.enabledShapeIds.map((shapeId) => resolveShapeId(shapeId)));
+  for (const input of getShapeToggleInputs()) {
+    input.checked = enabledShapeIds.has(resolveShapeId(input.value));
+  }
+
+  singleShapeInput.value = resolveShapeId(mood.defaults.singleShape);
+  bandDarkInput.value = resolveShapeId(mood.defaults.bandDark);
+  bandMidInput.value = resolveShapeId(mood.defaults.bandMid);
+  bandLightInput.value = resolveShapeId(mood.defaults.bandLight);
+  setMoodSelection(mood.id);
+}
+
+function setMoodSelection(moodId) {
+  if (!moodInput) {
+    return;
+  }
+
+  const resolvedMoodId = moodId === "custom" ? "custom" : resolveMoodId(moodId);
+  moodInput.value = resolvedMoodId || "custom";
+  const mood = moodMap.get(resolvedMoodId);
+  moodDetailsEl.textContent = mood
+    ? `${mood.description} Choose a visual family of shapes, then fine-tune individual shape choices below.`
+    : "Choose a visual family of shapes, then fine-tune individual shape choices below.";
+}
+
+function getShapeToggleInputs() {
+  return [...document.querySelectorAll(".shapeToggle")];
+}
+
+function isShapeMoodTuningControl(control) {
+  return control === singleShapeInput
+    || control === bandDarkInput
+    || control === bandMidInput
+    || control === bandLightInput
+    || control.classList.contains("shapeToggle");
 }
 
 function prepareWorkingImage() {
@@ -335,9 +477,11 @@ function renderPipeline() {
 
 function updateLayerConfigurationSummary() {
   const layers = getConfiguredLayers();
-  layerSummaryEl.innerHTML = layers
+  const heading = `${layers.length} active layer${layers.length === 1 ? "" : "s"}.`;
+  const details = layers
     .map((layer) => `Layer ${layer.index + 1}: ${layer.colorHex.toUpperCase()} with ${layer.tool.label}`)
     .join("<br />");
+  layerSummaryEl.innerHTML = `${heading}<br />${details}`;
 }
 
 function updatePreviewLayerSummary(layers) {
@@ -405,8 +549,7 @@ function readParams() {
 }
 
 function getConfiguredLayers() {
-  const activeCount = clampLayerCount(layerCountInput.value);
-  const rows = [...layerRowsEl.querySelectorAll(".layer-row")].slice(0, activeCount);
+  const rows = [...layerRowsEl.querySelectorAll(".layer-row")].slice(0, activeLayerCount);
   return rows.map((row, index) => {
     const colorHex = row.querySelector(".layer-color").value;
     const tool = getToolProfile(row.querySelector(".layer-tool").value);
@@ -720,6 +863,18 @@ function resolveShapeId(shapeId) {
   return getDefaultShapeId();
 }
 
+function resolveMoodId(moodId) {
+  if (moodId && moodMap.has(moodId)) {
+    return moodId;
+  }
+
+  if (moodMap.has("technical")) {
+    return "technical";
+  }
+
+  return moodRegistry[0]?.id || "";
+}
+
 function getDefaultToolId() {
   if (toolMap.has("01-liner")) {
     return "01-liner";
@@ -754,7 +909,7 @@ function getToolProfile(toolId) {
 }
 
 function clampLayerCount(value) {
-  const count = Number.parseInt(value || "1", 10);
+  const count = Number.parseInt(String(value || "1"), 10);
   return Math.max(1, Math.min(MAX_LAYER_COUNT, Number.isFinite(count) ? count : 1));
 }
 
