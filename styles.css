@@ -1,0 +1,266 @@
+:root {
+  --bg: #f2f0e8;
+  --bg-alt: #e1dfd4;
+  --ink: #1f2721;
+  --ink-soft: #49524a;
+  --accent: #c24f2a;
+  --accent-2: #2f7c7f;
+  --panel: rgba(255, 255, 255, 0.72);
+  --border: rgba(31, 39, 33, 0.2);
+  --shadow: 0 12px 30px rgba(28, 36, 29, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 15% 15%, rgba(194, 79, 42, 0.2), transparent 36%),
+    radial-gradient(circle at 85% 30%, rgba(47, 124, 127, 0.22), transparent 42%),
+    linear-gradient(135deg, var(--bg), var(--bg-alt));
+  min-height: 100vh;
+}
+
+.app-shell {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.2rem;
+}
+
+.hero {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  border-radius: 18px;
+  padding: 1.2rem 1.4rem;
+  box-shadow: var(--shadow);
+}
+
+.hero h1 {
+  font-size: clamp(1.6rem, 3.2vw, 2.8rem);
+  margin: 0;
+  letter-spacing: 0.04em;
+}
+
+.hero p {
+  margin: 0.4rem 0 0;
+  color: var(--ink-soft);
+}
+
+.layout {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) 1fr;
+  gap: 1rem;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--shadow);
+  padding: 1rem;
+}
+
+h2 {
+  margin-top: 0;
+  margin-bottom: 0.8rem;
+}
+
+h3 {
+  margin: 0.4rem 0;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+
+.controls-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.control-group {
+  border: 1px solid rgba(31, 39, 33, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 0.9rem;
+}
+
+.control-group__header {
+  margin-bottom: 0.75rem;
+}
+
+.control-group__header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.control-group__header p {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.8rem;
+  font-size: 0.92rem;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.field-row--triple {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.checkbox-field {
+  justify-content: end;
+}
+
+.checkbox-field input {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+input,
+select,
+button {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem 0.55rem;
+  font: inherit;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.inline-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.check-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.section-fieldset {
+  border: 1px solid rgba(31, 39, 33, 0.12);
+  border-radius: 12px;
+  padding: 0.7rem;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.section-fieldset legend {
+  padding: 0 0.3rem;
+  color: var(--ink-soft);
+}
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+button {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+#renderBtn {
+  background: linear-gradient(90deg, var(--accent), #db7b3f);
+  color: #fff;
+}
+
+#exportBtn {
+  background: linear-gradient(90deg, var(--accent-2), #4ca5a6);
+  color: #fff;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.status {
+  margin: 0.7rem 0 0;
+  color: var(--ink-soft);
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.8rem;
+}
+
+.preview-surface {
+  width: 100%;
+  min-height: clamp(420px, 68vh, 820px);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+}
+
+canvas,
+.svg-preview {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.svg-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.svg-preview svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+@media (max-width: 1020px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .field-row--triple {
+    grid-template-columns: 1fr;
+  }
+
+  .check-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

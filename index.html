@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PhotoPlotto</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="hero">
+        <h1>PhotoPlotto</h1>
+        <p>Turn any image into plotter-ready geometric SVG art.</p>
+      </header>
+
+      <main class="layout">
+        <section class="panel controls-panel">
+          <h2>Controls</h2>
+
+          <div class="control-group">
+            <div class="control-group__header">
+              <h3>Source Image</h3>
+              <p>Choose the image and set the physical drawing size.</p>
+            </div>
+
+            <label class="field">
+              <span>Image</span>
+              <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp" />
+            </label>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Page Size</span>
+                <select id="pageSize">
+                  <option value="A4">A4</option>
+                  <option value="Letter">Letter</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Orientation</span>
+                <select id="pageOrientation">
+                  <option value="portrait" selected>Portrait</option>
+                  <option value="landscape">Landscape</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Margin (mm)</span>
+                <input id="marginMm" type="number" min="0" max="40" step="0.5" value="10" />
+              </label>
+              <label class="field checkbox-field">
+                <span>Enable Border</span>
+                <input id="borderEnabled" type="checkbox" />
+              </label>
+            </div>
+
+            <div class="field-row control-visibility" data-visible-when="borderEnabled">
+              <label class="field">
+                <span>Border Inset (mm)</span>
+                <input id="borderInsetMm" type="number" min="0" max="30" step="0.5" value="4" />
+              </label>
+              <label class="field">
+                <span>Border Stroke (mm)</span>
+                <input id="borderStrokeMm" type="number" min="0.05" max="3" step="0.05" value="0.35" />
+              </label>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="control-group__header">
+              <h3>Tonal Mapping</h3>
+              <p>Control how grayscale values are interpreted before geometry is generated.</p>
+            </div>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Mapping Mode</span>
+                <select id="mappingMode">
+                  <option value="density">Density</option>
+                  <option value="stroke">Stroke</option>
+                  <option value="hybrid" selected>Hybrid</option>
+                </select>
+              </label>
+              <label class="field checkbox-field">
+                <span>Invert</span>
+                <input id="invert" type="checkbox" />
+              </label>
+            </div>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Gamma</span>
+                <input id="gamma" type="range" min="0.4" max="2.4" step="0.05" value="1" />
+              </label>
+              <label class="field">
+                <span>Contrast</span>
+                <input id="contrast" type="range" min="-60" max="60" step="1" value="0" />
+              </label>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="control-group__header">
+              <h3>Geometry Density</h3>
+              <p>Adjust sampling resolution and how much geometry appears in darker regions.</p>
+            </div>
+
+            <label class="field">
+              <span>Cell Size (mm)</span>
+              <input id="cellSizeMm" type="range" min="1" max="10" step="0.5" value="3" />
+            </label>
+
+            <label class="field control-visibility" data-visible-when="mapping:hybrid|density">
+              <span>Density Strength</span>
+              <input id="densityStrength" type="range" min="0" max="1" step="0.05" value="0.7" />
+            </label>
+          </div>
+
+          <div class="control-group control-visibility" data-visible-when="mapping:hybrid|stroke">
+            <div class="control-group__header">
+              <h3>Stroke Behavior</h3>
+              <p>Set the line-weight range used when stroke-based mapping is active.</p>
+            </div>
+
+            <label class="field">
+              <span>Stroke Min/Max</span>
+              <div class="inline-pair">
+                <input id="strokeMin" type="number" min="0.05" max="2" step="0.05" value="0.12" />
+                <input id="strokeMax" type="number" min="0.1" max="4" step="0.05" value="0.6" />
+              </div>
+            </label>
+          </div>
+
+          <div class="control-group">
+            <div class="control-group__header">
+              <h3>Shape Language</h3>
+              <p>Pick the geometric vocabulary and the rule used to assign forms across the image.</p>
+            </div>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Style Mode</span>
+                <select id="styleMode">
+                  <option value="single">Single Shape</option>
+                  <option value="banded">Intensity Bands</option>
+                  <option value="random" selected>Seeded Random</option>
+                </select>
+              </label>
+              <label class="field control-visibility" data-visible-when="style:random">
+                <span>Seed</span>
+                <input id="seed" type="number" step="1" value="42" />
+              </label>
+            </div>
+
+            <fieldset class="field section-fieldset control-visibility" data-visible-when="style:random">
+              <legend>Available Shapes</legend>
+              <div id="availableShapes" class="check-grid"></div>
+            </fieldset>
+
+            <div class="field-row control-visibility" data-visible-when="style:single">
+              <label class="field">
+                <span>Single Shape</span>
+                <select id="singleShape" data-default-shape="circle"></select>
+              </label>
+            </div>
+
+            <div class="field-row field-row--triple control-visibility" data-visible-when="style:banded">
+              <label class="field">
+                <span>Dark Band Shape</span>
+                <select id="bandDark" data-default-shape="square"></select>
+              </label>
+              <label class="field">
+                <span>Mid Band Shape</span>
+                <select id="bandMid" data-default-shape="circle"></select>
+              </label>
+              <label class="field">
+                <span>Light Band Shape</span>
+                <select id="bandLight" data-default-shape="hexagon"></select>
+              </label>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="renderBtn" type="button">Render SVG</button>
+            <button id="exportBtn" type="button" disabled>Export SVG</button>
+          </div>
+
+          <p id="status" class="status">Upload an image to begin.</p>
+        </section>
+
+        <section class="panel preview-panel">
+          <h2>Preview</h2>
+          <div class="preview-grid">
+            <div hidden>
+              <h3>Grayscale</h3>
+              <div class="preview-surface">
+                <canvas id="grayscaleCanvas" width="640" height="480"></canvas>
+              </div>
+            </div>
+            <div>
+              <h3>Vector Output</h3>
+              <div class="preview-surface">
+                <div id="svgPreview" class="svg-preview"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script defer src="shapes.js"></script>
+    <script defer src="app.js"></script>
+  </body>
+</html>
