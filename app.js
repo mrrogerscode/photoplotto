@@ -3,6 +3,9 @@ const PAGE_SIZES_MM = {
   Letter: { width: 216, height: 279 }
 };
 
+const MAX_LAYER_COUNT = 4;
+const DEFAULT_LAYER_COLORS = ["#111111", "#d64f3f", "#2f7c7f", "#d2a12a"];
+
 const imageInput = document.getElementById("imageInput");
 const pageSizeInput = document.getElementById("pageSize");
 const pageOrientationInput = document.getElementById("pageOrientation");
@@ -17,8 +20,9 @@ const invertInput = document.getElementById("invert");
 const gammaInput = document.getElementById("gamma");
 const contrastInput = document.getElementById("contrast");
 const densityStrengthInput = document.getElementById("densityStrength");
-const toolProfileInput = document.getElementById("toolProfile");
-const toolProfileDetailsEl = document.getElementById("toolProfileDetails");
+const layerCountInput = document.getElementById("layerCount");
+const layerRowsEl = document.getElementById("layerRows");
+const layerSummaryEl = document.getElementById("layerSummary");
 const singleShapeInput = document.getElementById("singleShape");
 const seedInput = document.getElementById("seed");
 const bandDarkInput = document.getElementById("bandDark");
@@ -31,8 +35,10 @@ const statusEl = document.getElementById("status");
 const grayscaleCanvas = document.getElementById("grayscaleCanvas");
 const grayscaleCtx = grayscaleCanvas.getContext("2d", { willReadFrequently: true });
 const svgPreview = document.getElementById("svgPreview");
+const previewLayerSummaryEl = document.getElementById("previewLayerSummary");
 const conditionalControls = [...document.querySelectorAll(".control-visibility")];
 const rangeInputs = [...document.querySelectorAll('input[type="range"][data-value-target]')];
+const collapsibleGroups = [...document.querySelectorAll(".control-group[data-collapsible]")];
 const shapeRegistry = Array.isArray(window.PhotoPlottoShapes) ? window.PhotoPlottoShapes : [];
 const shapeMap = new Map(shapeRegistry.map((shape) => [shape.id, shape]));
 const toolRegistry = Array.isArray(window.PhotoPlottoTools) ? window.PhotoPlottoTools : [];
@@ -40,11 +46,12 @@ const toolMap = new Map(toolRegistry.map((tool) => [tool.id, tool]));
 
 let loadedImageBitmap = null;
 let workingImageData = null;
-let lastSvg = "";
+let lastRender = null;
 
 initializeShapeControls();
-initializeToolControls();
+initializeLayerControls();
 initializeRangeValueDisplays();
+initializeCollapsibleControls();
 
 imageInput.addEventListener("change", async (event) => {
   const [file] = event.target.files;
@@ -61,6 +68,7 @@ imageInput.addEventListener("change", async (event) => {
   setStatus(`Loaded ${file.name} (${loadedImageBitmap.width}x${loadedImageBitmap.height}).`);
   prepareWorkingImage();
   syncControlVisibility();
+  updateLayerConfigurationSummary();
   renderPipeline();
 });
 
@@ -74,7 +82,8 @@ imageInput.addEventListener("change", async (event) => {
       updateRangeValueDisplay(control);
     }
     syncControlVisibility();
-    updateToolProfileDetails();
+    updateLayerRowsState();
+    updateLayerConfigurationSummary();
     if (!loadedImageBitmap) {
       return;
     }
@@ -83,28 +92,51 @@ imageInput.addEventListener("change", async (event) => {
 });
 
 syncControlVisibility();
-updateToolProfileDetails();
+updateLayerRowsState();
+updateLayerConfigurationSummary();
 
 renderBtn.addEventListener("click", () => {
   renderPipeline();
 });
 
 exportBtn.addEventListener("click", () => {
-  if (!lastSvg) {
+  if (!lastRender?.exportLayers?.length) {
     return;
   }
 
-  const blob = new Blob([lastSvg], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `photoplotto-${Date.now()}.svg`;
-  a.click();
-  URL.revokeObjectURL(url);
+  for (const layer of lastRender.exportLayers) {
+    downloadSvg(layer.svg, layer.fileName);
+  }
 });
 
 function setStatus(message) {
   statusEl.textContent = message;
+}
+
+function initializeCollapsibleControls() {
+  for (const group of collapsibleGroups) {
+    const button = group.querySelector(".control-group__toggle");
+    const body = group.querySelector(".control-group__body");
+    if (!button || !body) {
+      continue;
+    }
+
+    button.addEventListener("click", () => {
+      setControlGroupCollapsed(group, body, button, !group.classList.contains("is-collapsed"));
+    });
+
+    setControlGroupCollapsed(group, body, button, false);
+  }
+}
+
+function setControlGroupCollapsed(group, body, button, collapsed) {
+  group.classList.toggle("is-collapsed", collapsed);
+  body.hidden = collapsed;
+  button.setAttribute("aria-expanded", String(!collapsed));
+  const label = button.querySelector(".control-group__toggleText");
+  if (label) {
+    label.textContent = collapsed ? "Expand" : "Collapse";
+  }
 }
 
 function initializeRangeValueDisplays() {
@@ -137,21 +169,97 @@ function initializeShapeControls() {
   populateShapeSelect(bandLightInput);
 }
 
-function initializeToolControls() {
+function initializeLayerControls() {
   if (!toolRegistry.length) {
     throw new Error("PhotoPlottoTools registry is empty.");
   }
 
-  const defaultToolId = resolveToolId(toolProfileInput.dataset.defaultTool);
-  toolProfileInput.innerHTML = "";
+  layerRowsEl.innerHTML = "";
+  for (let index = 0; index < MAX_LAYER_COUNT; index += 1) {
+    layerRowsEl.append(createLayerRow(index));
+  }
+}
+
+function createLayerRow(index) {
+  const row = document.createElement("section");
+  row.className = "layer-row";
+  row.dataset.layerIndex = String(index);
+
+  const header = document.createElement("div");
+  header.className = "layer-row__header";
+
+  const title = document.createElement("strong");
+  title.textContent = `Layer ${index + 1}`;
+  const swatch = document.createElement("span");
+  swatch.className = "layer-row__swatch";
+  header.append(title, swatch);
+
+  const fieldRow = document.createElement("div");
+  fieldRow.className = "field-row";
+
+  const colorField = document.createElement("label");
+  colorField.className = "field";
+  const colorLabel = document.createElement("span");
+  colorLabel.textContent = "Layer Color";
+  const colorInput = document.createElement("input");
+  colorInput.className = "layer-color";
+  colorInput.type = "color";
+  colorInput.value = DEFAULT_LAYER_COLORS[index] || DEFAULT_LAYER_COLORS[0];
+  colorField.append(colorLabel, colorInput);
+
+  const toolField = document.createElement("label");
+  toolField.className = "field";
+  const toolLabel = document.createElement("span");
+  toolLabel.textContent = "Tool Profile";
+  const toolSelect = document.createElement("select");
+  toolSelect.className = "layer-tool";
+  populateToolSelect(toolSelect, getDefaultToolId());
+  toolField.append(toolLabel, toolSelect);
+
+  fieldRow.append(colorField, toolField);
+
+  const details = document.createElement("p");
+  details.className = "helper-text layer-row__details";
+
+  row.append(header, fieldRow, details);
+  updateLayerRowPresentation(row, index < Number(layerCountInput.value || 1));
+  return row;
+}
+
+function populateToolSelect(selectEl, defaultToolId) {
+  selectEl.innerHTML = "";
 
   for (const tool of toolRegistry) {
     const option = document.createElement("option");
     option.value = tool.id;
     option.textContent = tool.label;
     option.selected = tool.id === defaultToolId;
-    toolProfileInput.append(option);
+    selectEl.append(option);
   }
+}
+
+function updateLayerRowsState() {
+  const activeCount = clampLayerCount(layerCountInput.value);
+  const rows = [...layerRowsEl.querySelectorAll(".layer-row")];
+  for (const row of rows) {
+    const index = Number(row.dataset.layerIndex);
+    updateLayerRowPresentation(row, index < activeCount);
+  }
+}
+
+function updateLayerRowPresentation(row, isActive) {
+  row.hidden = !isActive;
+  if (!isActive) {
+    return;
+  }
+
+  const colorInput = row.querySelector(".layer-color");
+  const toolSelect = row.querySelector(".layer-tool");
+  const swatch = row.querySelector(".layer-row__swatch");
+  const details = row.querySelector(".layer-row__details");
+  const tool = getToolProfile(toolSelect.value);
+  swatch.style.backgroundColor = colorInput.value;
+  details.textContent = `${tool.label}. Single-pass line width ${fmt(tool.minStrokeMm)}-${fmt(tool.maxStrokeMm)}mm. Recommended cell size ${fmt(tool.recommendedCellSizeMm)}mm.`;
 }
 
 function renderAvailableShapes() {
@@ -210,25 +318,32 @@ function renderPipeline() {
   const params = readParams();
   const grayscale = computeGrayscale(workingImageData, params);
   drawGrayscalePreview(grayscale);
-  const svg = generateSvg(grayscale, params);
+  const artwork = generateLayeredArtwork(workingImageData, grayscale, params);
 
-  lastSvg = svg;
-  svgPreview.innerHTML = svg;
-  exportBtn.disabled = false;
-}
-
-function updateToolProfileDetails() {
-  const tool = getSelectedToolProfile();
-  if (!tool || !toolProfileDetailsEl) {
+  if (!artwork) {
+    lastRender = null;
+    svgPreview.innerHTML = "";
+    exportBtn.disabled = true;
     return;
   }
 
-  const cellSize = Math.max(0.8, Number(cellSizeMmInput.value) || 3);
-  const compatibility = cellSize < tool.recommendedCellSizeMm
-    ? `Cell size ${fmt(cellSize)}mm is tighter than the recommended ${fmt(tool.recommendedCellSizeMm)}mm for this tool.`
-    : `Cell size ${fmt(cellSize)}mm is compatible with this tool.`;
+  lastRender = artwork;
+  svgPreview.innerHTML = artwork.previewSvg;
+  updatePreviewLayerSummary(artwork.exportLayers);
+  exportBtn.disabled = !artwork.exportLayers.length;
+}
 
-  toolProfileDetailsEl.textContent = `${tool.notes} Tip ${fmt(tool.tipWidthMm)}mm. Stroke range ${fmt(tool.minStrokeMm)}-${fmt(tool.maxStrokeMm)}mm. ${compatibility}`;
+function updateLayerConfigurationSummary() {
+  const layers = getConfiguredLayers();
+  layerSummaryEl.innerHTML = layers
+    .map((layer) => `Layer ${layer.index + 1}: ${layer.colorHex.toUpperCase()} with ${layer.tool.label}`)
+    .join("<br />");
+}
+
+function updatePreviewLayerSummary(layers) {
+  previewLayerSummaryEl.innerHTML = layers
+    .map((layer) => `<li><span class="preview-layer-summary__swatch" style="background:${layer.colorHex}"></span>Layer ${layer.index + 1}: ${layer.shapeCount} shapes, ${layer.toolLabel}</li>`)
+    .join("");
 }
 
 function syncControlVisibility() {
@@ -265,8 +380,6 @@ function matchesVisibilityRule(rule, state) {
 }
 
 function readParams() {
-  const toolProfile = getSelectedToolProfile();
-
   return {
     pageSize: pageSizeInput.value,
     pageOrientation: pageOrientationInput.value,
@@ -281,17 +394,30 @@ function readParams() {
     gamma: Math.max(0.2, Number(gammaInput.value) || 1),
     contrast: Number(contrastInput.value) || 0,
     densityStrength: Math.min(1, Math.max(0, Number(densityStrengthInput.value) || 0.7)),
-    toolProfileId: toolProfile.id,
-    toolTipWidthMm: toolProfile.tipWidthMm,
-    strokeMin: toolProfile.minStrokeMm,
-    strokeMax: toolProfile.maxStrokeMm,
     singleShape: resolveShapeId(singleShapeInput.value),
     seed: Number(seedInput.value) || 42,
     bandDark: resolveShapeId(bandDarkInput.value),
     bandMid: resolveShapeId(bandMidInput.value),
     bandLight: resolveShapeId(bandLightInput.value),
-    enabledShapes: [...document.querySelectorAll(".shapeToggle:checked")].map((el) => resolveShapeId(el.value))
+    enabledShapes: [...document.querySelectorAll(".shapeToggle:checked")].map((el) => resolveShapeId(el.value)),
+    layers: getConfiguredLayers()
   };
+}
+
+function getConfiguredLayers() {
+  const activeCount = clampLayerCount(layerCountInput.value);
+  const rows = [...layerRowsEl.querySelectorAll(".layer-row")].slice(0, activeCount);
+  return rows.map((row, index) => {
+    const colorHex = row.querySelector(".layer-color").value;
+    const tool = getToolProfile(row.querySelector(".layer-tool").value);
+    return {
+      index,
+      colorHex,
+      colorRgb: hexToRgb(colorHex),
+      tool,
+      toolId: tool.id
+    };
+  });
 }
 
 function computeGrayscale(imageData, params) {
@@ -333,7 +459,7 @@ function drawGrayscalePreview(grayscale) {
   grayscaleCtx.putImageData(imageData, 0, 0);
 }
 
-function generateSvg(grayscale, params) {
+function generateLayeredArtwork(colorImageData, grayscale, params) {
   const page = getOrientedPage(params.pageSize, params.pageOrientation);
   const margin = Math.min(params.marginMm, Math.min(page.width, page.height) * 0.4);
   const drawWidth = page.width - margin * 2;
@@ -341,7 +467,7 @@ function generateSvg(grayscale, params) {
 
   if (drawWidth <= 0 || drawHeight <= 0) {
     setStatus("Margin is too large for the selected page size.");
-    return "";
+    return null;
   }
 
   const fitted = fitRect(grayscale.width, grayscale.height, drawWidth, drawHeight);
@@ -351,65 +477,98 @@ function generateSvg(grayscale, params) {
   const rows = Math.max(1, Math.floor(fitted.height / params.cellSizeMm));
   const cellW = fitted.width / cols;
   const cellH = fitted.height / rows;
-
-  const shapes = [];
-  const frameElements = [];
-  let shapeCount = 0;
   const baseSeed = (params.seed | 0) ^ (cols * 92821) ^ (rows * 68917);
+  const layers = params.layers.map((layer) => ({ ...layer, shapes: [], shapeCount: 0 }));
 
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
       const cellIndex = row * cols + col;
-      const rng = mulberry32(baseSeed + cellIndex * 1013904223);
       const intensity = sampleCellIntensity(grayscale, col / cols, row / rows, 1 / cols, 1 / rows);
       const darkness = 1 - intensity;
+      const layerIndex = pickLayerIndex(colorImageData, layers, col / cols, row / rows, 1 / cols, 1 / rows);
+      const layer = layers[layerIndex];
+      const rng = mulberry32(baseSeed + cellIndex * 1013904223);
       const shapeType = pickShape(params, darkness, rng);
       const centerX = artX + (col + 0.5) * cellW;
       const centerY = artY + (row + 0.5) * cellH;
-
       const count = getShapeCount(params, darkness, rng);
+
       for (let i = 0; i < count; i += 1) {
         const jitterX = (rng() - 0.5) * cellW * 0.65;
         const jitterY = (rng() - 0.5) * cellH * 0.65;
         const size = Math.min(cellW, cellH) * (0.26 + darkness * 0.42);
-        const strokeWidth = getStrokeWidth(params, darkness);
+        const strokeWidth = getStrokeWidth(layer, params.mappingMode, darkness);
         const opacity = 0.35 + darkness * 0.65;
         const shapeSvg = buildShapeSvg(shapeType, centerX + jitterX, centerY + jitterY, size, strokeWidth, opacity);
         if (shapeSvg) {
-          shapes.push(shapeSvg);
-          shapeCount += 1;
+          layer.shapes.push(shapeSvg);
+          layer.shapeCount += 1;
         }
       }
     }
   }
 
-  if (params.borderEnabled) {
-    const inset = Math.max(0, params.borderInsetMm);
-    const borderX = artX + inset;
-    const borderY = artY + inset;
-    const borderW = fitted.width - inset * 2;
-    const borderH = fitted.height - inset * 2;
+  const borderElement = buildBorderSvg(params, artX, artY, fitted.width, fitted.height);
+  const previewSvg = buildCompositePreviewSvg(page, margin, drawWidth, drawHeight, baseSeed, layers, borderElement);
+  const exportLayers = layers.map((layer, index) => ({
+    index,
+    colorHex: layer.colorHex,
+    toolLabel: layer.tool.label,
+    shapeCount: layer.shapeCount,
+    fileName: buildLayerFileName(index, layer),
+    svg: buildLayerSvg(page, margin, drawWidth, drawHeight, baseSeed, params, layer, index === 0 ? borderElement : "")
+  }));
+  const totalShapes = exportLayers.reduce((sum, layer) => sum + layer.shapeCount, 0);
+  setStatus(`Prepared ${exportLayers.length} layer${exportLayers.length === 1 ? "" : "s"} and ${totalShapes} shapes on ${params.pageSize} ${params.pageOrientation}.`);
 
-    if (borderW > 0 && borderH > 0) {
-      frameElements.push(
-        `<rect x="${fmt(borderX)}" y="${fmt(borderY)}" width="${fmt(borderW)}" height="${fmt(borderH)}" stroke-width="${fmt(params.borderStrokeMm)}" stroke-opacity="1"/>`
-      );
-    }
+  return {
+    previewSvg,
+    exportLayers
+  };
+}
+
+function buildBorderSvg(params, artX, artY, fittedWidth, fittedHeight) {
+  if (!params.borderEnabled) {
+    return "";
   }
 
-  setStatus(`Rendered ${shapeCount} shapes on ${params.pageSize} ${params.pageOrientation} with ${margin.toFixed(1)}mm margin.`);
+  const inset = Math.max(0, params.borderInsetMm);
+  const borderX = artX + inset;
+  const borderY = artY + inset;
+  const borderW = fittedWidth - inset * 2;
+  const borderH = fittedHeight - inset * 2;
 
-  const clipId = `clip-${Math.abs(baseSeed)}`;
+  if (borderW <= 0 || borderH <= 0) {
+    return "";
+  }
+
+  return `<rect x="${fmt(borderX)}" y="${fmt(borderY)}" width="${fmt(borderW)}" height="${fmt(borderH)}" stroke-width="${fmt(params.borderStrokeMm)}" stroke-opacity="1"/>`;
+}
+
+function buildCompositePreviewSvg(page, margin, drawWidth, drawHeight, baseSeed, layers, borderElement) {
+  const clipId = `preview-clip-${Math.abs(baseSeed)}`;
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${page.width}mm" height="${page.height}mm" viewBox="0 0 ${page.width} ${page.height}">`,
+    `<defs><clipPath id="${clipId}"><rect x="${fmt(margin)}" y="${fmt(margin)}" width="${fmt(drawWidth)}" height="${fmt(drawHeight)}" /></clipPath></defs>`,
+    `<rect x="0" y="0" width="${page.width}" height="${page.height}" fill="white"/>`,
+    ...layers.map((layer) => `<g fill="none" stroke="${layer.colorHex}" clip-path="url(#${clipId})">${layer.shapes.join("\n")}</g>`),
+    borderElement ? `<g fill="none" stroke="black">${borderElement}</g>` : "",
+    `</svg>`
+  ].join("\n");
+}
+
+function buildLayerSvg(page, margin, drawWidth, drawHeight, baseSeed, params, layer, borderElement) {
+  const clipId = `layer-clip-${Math.abs(baseSeed)}-${layer.index}`;
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<svg xmlns="http://www.w3.org/2000/svg" width="${page.width}mm" height="${page.height}mm" viewBox="0 0 ${page.width} ${page.height}">`,
-    `<desc>Generated by PhotoPlotto: mapping=${params.mappingMode}; style=${params.styleMode}; seed=${params.seed}</desc>`,
-    `<defs><clipPath id="${clipId}"><rect x="${margin}" y="${margin}" width="${drawWidth}" height="${drawHeight}" /></clipPath></defs>`,
+    `<desc>Generated by PhotoPlotto: layer=${layer.index + 1}; color=${layer.colorHex}; tool=${layer.tool.label}; mapping=${params.mappingMode}; style=${params.styleMode}; seed=${params.seed}</desc>`,
+    `<defs><clipPath id="${clipId}"><rect x="${fmt(margin)}" y="${fmt(margin)}" width="${fmt(drawWidth)}" height="${fmt(drawHeight)}" /></clipPath></defs>`,
     `<rect x="0" y="0" width="${page.width}" height="${page.height}" fill="white"/>`,
-    `<g fill="none" stroke="black" clip-path="url(#${clipId})">`,
-    ...shapes,
-    ...frameElements,
+    `<g fill="none" stroke="${layer.colorHex}" clip-path="url(#${clipId})">`,
+    ...layer.shapes,
     `</g>`,
+    borderElement ? `<g fill="none" stroke="black">${borderElement}</g>` : "",
     `</svg>`
   ].join("\n");
 }
@@ -435,6 +594,44 @@ function sampleCellIntensity(grayscale, nx, ny, nw, nh) {
   const x = Math.min(grayscale.width - 1, Math.floor((nx + nw * 0.5) * grayscale.width));
   const y = Math.min(grayscale.height - 1, Math.floor((ny + nh * 0.5) * grayscale.height));
   return grayscale.values[y * grayscale.width + x];
+}
+
+function sampleCellColor(imageData, nx, ny, nw, nh) {
+  const x = Math.min(imageData.width - 1, Math.floor((nx + nw * 0.5) * imageData.width));
+  const y = Math.min(imageData.height - 1, Math.floor((ny + nh * 0.5) * imageData.height));
+  const offset = (y * imageData.width + x) * 4;
+  return {
+    r: imageData.data[offset],
+    g: imageData.data[offset + 1],
+    b: imageData.data[offset + 2]
+  };
+}
+
+function pickLayerIndex(imageData, layers, nx, ny, nw, nh) {
+  if (layers.length <= 1) {
+    return 0;
+  }
+
+  const sample = sampleCellColor(imageData, nx, ny, nw, nh);
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const layer of layers) {
+    const distance = getColorDistance(sample, layer.colorRgb);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = layer.index;
+    }
+  }
+
+  return bestIndex;
+}
+
+function getColorDistance(a, b) {
+  const dr = a.r - b.r;
+  const dg = a.g - b.g;
+  const db = a.b - b.b;
+  return dr * dr + dg * dg + db * db;
 }
 
 function pickShape(params, darkness, rng) {
@@ -471,14 +668,14 @@ function getShapeCount(params, darkness, rng) {
   return Math.max(1, count);
 }
 
-function getStrokeWidth(params, darkness) {
-  const minWidth = Math.min(params.strokeMin, params.strokeMax);
-  const maxWidth = Math.max(params.strokeMin, params.strokeMax);
-  if (params.mappingMode === "density") {
-    return Math.max(minWidth, params.toolTipWidthMm || minWidth);
+function getStrokeWidth(layer, mappingMode, darkness) {
+  const minWidth = Math.min(layer.tool.minStrokeMm, layer.tool.maxStrokeMm);
+  const maxWidth = Math.max(layer.tool.minStrokeMm, layer.tool.maxStrokeMm);
+  if (mappingMode === "density") {
+    return Math.max(minWidth, layer.tool.tipWidthMm || minWidth);
   }
 
-  return Math.max(minWidth + (maxWidth - minWidth) * darkness, params.toolTipWidthMm || minWidth);
+  return Math.max(minWidth + (maxWidth - minWidth) * darkness, layer.tool.tipWidthMm || minWidth);
 }
 
 function buildShapeSvg(shapeType, cx, cy, size, strokeWidth, opacity) {
@@ -489,6 +686,22 @@ function buildShapeSvg(shapeType, cx, cy, size, strokeWidth, opacity) {
 
   const normalizedStroke = size > 0 ? strokeWidth / size : strokeWidth;
   return `<g transform="translate(${fmt(cx)} ${fmt(cy)}) scale(${fmt(size)})" stroke-width="${fmt(normalizedStroke)}" stroke-opacity="${fmt(opacity)}">${shape.markup}</g>`;
+}
+
+function downloadSvg(svg, fileName) {
+  const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function buildLayerFileName(index, layer) {
+  const colorToken = layer.colorHex.replace("#", "").toLowerCase();
+  const toolToken = layer.toolId.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+  return `photoplotto-layer-${index + 1}-${colorToken}-${toolToken}.svg`;
 }
 
 function getDefaultShapeId() {
@@ -523,8 +736,8 @@ function resolveToolId(toolId) {
   return getDefaultToolId();
 }
 
-function getSelectedToolProfile() {
-  const tool = toolMap.get(resolveToolId(toolProfileInput.value));
+function getToolProfile(toolId) {
+  const tool = toolMap.get(resolveToolId(toolId));
   if (tool) {
     return tool;
   }
@@ -537,6 +750,23 @@ function getSelectedToolProfile() {
     maxStrokeMm: 0.35,
     recommendedCellSizeMm: 2,
     notes: "Fallback tool profile."
+  };
+}
+
+function clampLayerCount(value) {
+  const count = Number.parseInt(value || "1", 10);
+  return Math.max(1, Math.min(MAX_LAYER_COUNT, Number.isFinite(count) ? count : 1));
+}
+
+function hexToRgb(hex) {
+  const normalized = hex.replace("#", "");
+  const value = normalized.length === 3
+    ? normalized.split("").map((ch) => ch + ch).join("")
+    : normalized;
+  return {
+    r: Number.parseInt(value.slice(0, 2), 16),
+    g: Number.parseInt(value.slice(2, 4), 16),
+    b: Number.parseInt(value.slice(4, 6), 16)
   };
 }
 

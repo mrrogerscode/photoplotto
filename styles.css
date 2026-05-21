@@ -96,7 +96,15 @@ h3 {
 }
 
 .control-group__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
   margin-bottom: 0.75rem;
+}
+
+.control-group__header > div {
+  min-width: 0;
 }
 
 .control-group__header h3 {
@@ -110,6 +118,29 @@ h3 {
   font-size: 0.82rem;
   line-height: 1.35;
   color: var(--ink-soft);
+}
+
+.control-group__body {
+  display: block;
+}
+
+.control-group.is-collapsed .control-group__header {
+  margin-bottom: 0;
+}
+
+.control-group__toggle {
+  flex: 0 0 auto;
+  min-width: 5.6rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.control-group__toggle:hover {
+  background: rgba(255, 255, 255, 0.92);
 }
 
 .field {
@@ -147,6 +178,39 @@ h3 {
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.2rem;
+}
+
+.layer-rows {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.layer-row {
+  border: 1px solid rgba(31, 39, 33, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.45);
+  padding: 0.7rem;
+}
+
+.layer-row__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.layer-row__swatch,
+.preview-layer-summary__swatch {
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 999px;
+  border: 1px solid rgba(31, 39, 33, 0.2);
+  flex: 0 0 auto;
+}
+
+.layer-row__details {
+  margin-top: -0.15rem;
 }
 
 .checkbox-field {
@@ -242,6 +306,22 @@ button:disabled {
   gap: 0.8rem;
 }
 
+.preview-layer-summary {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+}
+
+.preview-layer-summary li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .preview-surface {
   width: 100%;
   min-height: clamp(420px, 68vh, 820px);
@@ -282,6 +362,14 @@ canvas,
 @media (max-width: 1020px) {
   .layout {
     grid-template-columns: 1fr;
+  }
+
+  .control-group__header {
+    flex-direction: column;
+  }
+
+  .control-group__toggle {
+    width: 100%;
   }
 
   .field-row {

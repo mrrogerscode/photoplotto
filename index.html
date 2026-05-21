@@ -17,192 +17,233 @@
         <section class="panel controls-panel">
           <h2>Controls</h2>
 
-          <div class="control-group">
+          <div class="control-group" data-collapsible>
             <div class="control-group__header">
-              <h3>Source Image</h3>
-              <p>Choose the image and set the physical drawing size.</p>
+              <div>
+                <h3>Source Image</h3>
+                <p>Choose the image and set the physical drawing size.</p>
+              </div>
+              <button class="control-group__toggle" type="button" aria-expanded="true" aria-controls="sourceImageSectionBody">
+                <span class="control-group__toggleText">Collapse</span>
+              </button>
             </div>
 
-            <label class="field">
-              <span>Image</span>
-              <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp" />
-            </label>
-
-            <div class="field-row">
+            <div id="sourceImageSectionBody" class="control-group__body">
               <label class="field">
-                <span>Page Size</span>
-                <select id="pageSize">
-                  <option value="A4">A4</option>
-                  <option value="Letter">Letter</option>
+                <span>Image</span>
+                <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp" />
+              </label>
+
+              <div class="field-row">
+                <label class="field">
+                  <span>Page Size</span>
+                  <select id="pageSize">
+                    <option value="A4">A4</option>
+                    <option value="Letter">Letter</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Orientation</span>
+                  <select id="pageOrientation">
+                    <option value="portrait" selected>Portrait</option>
+                    <option value="landscape">Landscape</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="field-row">
+                <label class="field">
+                  <span>Margin (mm)</span>
+                  <input id="marginMm" type="number" min="0" max="40" step="0.5" value="10" />
+                </label>
+                <label class="field checkbox-field">
+                  <span>Enable Border</span>
+                  <input id="borderEnabled" type="checkbox" />
+                </label>
+              </div>
+
+              <div class="field-row control-visibility" data-visible-when="borderEnabled">
+                <label class="field">
+                  <span>Border Inset (mm)</span>
+                  <input id="borderInsetMm" type="number" min="0" max="30" step="0.5" value="4" />
+                </label>
+                <label class="field">
+                  <span>Border Stroke (mm)</span>
+                  <input id="borderStrokeMm" type="number" min="0.05" max="3" step="0.05" value="0.35" />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-group" data-collapsible>
+            <div class="control-group__header">
+              <div>
+                <h3>Layer Configuration</h3>
+                <p>Build the plotted output as one or more ordered layers. One active layer behaves like the current single-color export.</p>
+              </div>
+              <button class="control-group__toggle" type="button" aria-expanded="true" aria-controls="layerConfigurationSectionBody">
+                <span class="control-group__toggleText">Collapse</span>
+              </button>
+            </div>
+
+            <div id="layerConfigurationSectionBody" class="control-group__body">
+              <label class="field">
+                <span>Active Layers</span>
+                <select id="layerCount">
+                  <option value="1" selected>1 Layer</option>
+                  <option value="2">2 Layers</option>
+                  <option value="3">3 Layers</option>
+                  <option value="4">4 Layers</option>
                 </select>
               </label>
-              <label class="field">
-                <span>Orientation</span>
-                <select id="pageOrientation">
-                  <option value="portrait" selected>Portrait</option>
-                  <option value="landscape">Landscape</option>
-                </select>
-              </label>
+
+              <div id="layerRows" class="layer-rows"></div>
+              <p id="layerSummary" class="helper-text"></p>
+            </div>
+          </div>
+
+          <div class="control-group" data-collapsible>
+            <div class="control-group__header">
+              <div>
+                <h3>Tonal Mapping</h3>
+                <p>Control how grayscale values are interpreted before geometry is generated.</p>
+              </div>
+              <button class="control-group__toggle" type="button" aria-expanded="true" aria-controls="tonalMappingSectionBody">
+                <span class="control-group__toggleText">Collapse</span>
+              </button>
             </div>
 
-            <div class="field-row">
-              <label class="field">
-                <span>Margin (mm)</span>
-                <input id="marginMm" type="number" min="0" max="40" step="0.5" value="10" />
-              </label>
-              <label class="field checkbox-field">
-                <span>Enable Border</span>
-                <input id="borderEnabled" type="checkbox" />
-              </label>
+            <div id="tonalMappingSectionBody" class="control-group__body">
+              <div class="field-row">
+                <label class="field">
+                  <span>Mapping Mode</span>
+                  <select id="mappingMode">
+                    <option value="density" selected>Density</option>
+                    <option value="stroke">Stroke</option>
+                    <option value="hybrid">Hybrid</option>
+                  </select>
+                </label>
+                <label class="field checkbox-field">
+                  <span>Invert</span>
+                  <input id="invert" type="checkbox" />
+                </label>
+              </div>
+
+              <div class="mapping-help" aria-label="Tonal mapping descriptions">
+                <p class="helper-text"><strong>Density:</strong> darker areas create more marks while line width stays mostly fixed.</p>
+                <p class="helper-text"><strong>Stroke:</strong> darker areas create thicker lines with fewer changes in mark count.</p>
+                <p class="helper-text"><strong>Hybrid:</strong> darker areas use both more marks and thicker lines.</p>
+              </div>
+
+              <div class="field-row">
+                <label class="field">
+                  <span>Gamma</span>
+                  <span class="field-label">Gamma <span id="gammaValue" class="field-value">1.00</span></span>
+                  <input id="gamma" type="range" min="0.4" max="2.4" step="0.05" value="1" data-value-target="gammaValue" data-value-decimals="2" />
+                  <span class="helper-text">Shifts midtones brighter or darker without changing black and white extremes as much.</span>
+                </label>
+                <label class="field">
+                  <span>Contrast</span>
+                  <span class="field-label">Contrast <span id="contrastValue" class="field-value">0</span></span>
+                  <input id="contrast" type="range" min="-60" max="60" step="1" value="0" data-value-target="contrastValue" data-value-decimals="0" />
+                  <span class="helper-text">Increases or softens separation between light and dark areas before shapes are generated.</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-group" data-collapsible>
+            <div class="control-group__header">
+              <div>
+                <h3>Geometry Density</h3>
+                <p>Adjust sampling resolution and how much geometry appears in darker regions.</p>
+              </div>
+              <button class="control-group__toggle" type="button" aria-expanded="true" aria-controls="geometryDensitySectionBody">
+                <span class="control-group__toggleText">Collapse</span>
+              </button>
             </div>
 
-            <div class="field-row control-visibility" data-visible-when="borderEnabled">
+            <div id="geometryDensitySectionBody" class="control-group__body">
               <label class="field">
-                <span>Border Inset (mm)</span>
-                <input id="borderInsetMm" type="number" min="0" max="30" step="0.5" value="4" />
+                <span class="field-label">Cell Size (mm) <span id="cellSizeMmValue" class="field-value">3.0 mm</span></span>
+                <input id="cellSizeMm" type="range" min="1" max="10" step="0.5" value="3" data-value-target="cellSizeMmValue" data-value-decimals="1" data-value-suffix=" mm" />
+                <span class="helper-text">Controls the sampling grid size. Smaller cells capture more detail; larger cells create a simpler, looser drawing.</span>
               </label>
-              <label class="field">
-                <span>Border Stroke (mm)</span>
-                <input id="borderStrokeMm" type="number" min="0.05" max="3" step="0.05" value="0.35" />
+
+              <label class="field control-visibility" data-visible-when="mapping:hybrid|density">
+                <span class="field-label">Density Strength <span id="densityStrengthValue" class="field-value">0.70</span></span>
+                <input id="densityStrength" type="range" min="0" max="1" step="0.05" value="0.7" data-value-target="densityStrengthValue" data-value-decimals="2" />
+                <span class="helper-text">Controls how strongly dark areas add extra marks. Higher values increase visual weight and plotting complexity.</span>
               </label>
             </div>
           </div>
 
-          <div class="control-group">
+          <div class="control-group" data-collapsible>
             <div class="control-group__header">
-              <h3>Tool Configuration</h3>
-              <p>Select the pen or drawing tool so stroke widths stay plotter-friendly.</p>
+              <div>
+                <h3>Shape Language</h3>
+                <p>Pick the geometric vocabulary and the rule used to assign forms across the image.</p>
+              </div>
+              <button class="control-group__toggle" type="button" aria-expanded="true" aria-controls="shapeLanguageSectionBody">
+                <span class="control-group__toggleText">Collapse</span>
+              </button>
             </div>
 
-            <label class="field">
-              <span>Tool Profile</span>
-              <select id="toolProfile" data-default-tool="01-liner"></select>
-            </label>
+            <div id="shapeLanguageSectionBody" class="control-group__body">
+              <div class="mapping-help" aria-label="Shape language descriptions">
+                <p class="helper-text"><strong>Single Shape:</strong> uses one selected shape for every mark.</p>
+                <p class="helper-text"><strong>Intensity Bands:</strong> switches shape based on whether an area is dark, midtone, or light.</p>
+                <p class="helper-text"><strong>Seeded Random:</strong> mixes enabled shapes in a repeatable random pattern.</p>
+              </div>
 
-            <p id="toolProfileDetails" class="helper-text"></p>
-          </div>
+              <div class="field-row">
+                <label class="field">
+                  <span>Style Mode</span>
+                  <select id="styleMode">
+                    <option value="single">Single Shape</option>
+                    <option value="banded">Intensity Bands</option>
+                    <option value="random" selected>Seeded Random</option>
+                  </select>
+                  <span class="helper-text">Chooses how shapes are assigned across the image.</span>
+                </label>
+                <label class="field control-visibility" data-visible-when="style:random">
+                  <span>Seed</span>
+                  <input id="seed" type="number" step="1" value="42" />
+                  <span class="helper-text">Keeps random shape placement repeatable so the same settings produce the same result.</span>
+                </label>
+              </div>
 
-          <div class="control-group">
-            <div class="control-group__header">
-              <h3>Tonal Mapping</h3>
-              <p>Control how grayscale values are interpreted before geometry is generated.</p>
-            </div>
+              <fieldset class="field section-fieldset control-visibility" data-visible-when="style:random">
+                <legend>Available Shapes</legend>
+                <div id="availableShapes" class="check-grid"></div>
+                <p class="helper-text">Choose which shapes can appear when using Seeded Random mode.</p>
+              </fieldset>
 
-            <div class="field-row">
-              <label class="field">
-                <span>Mapping Mode</span>
-                <select id="mappingMode">
-                  <option value="density" selected>Density</option>
-                  <option value="stroke">Stroke</option>
-                  <option value="hybrid">Hybrid</option>
-                </select>
-              </label>
-              <label class="field checkbox-field">
-                <span>Invert</span>
-                <input id="invert" type="checkbox" />
-              </label>
-            </div>
+              <div class="field-row control-visibility" data-visible-when="style:single">
+                <label class="field">
+                  <span>Single Shape</span>
+                  <select id="singleShape" data-default-shape="circle"></select>
+                  <span class="helper-text">Selects the one shape used everywhere in Single Shape mode.</span>
+                </label>
+              </div>
 
-            <div class="mapping-help" aria-label="Tonal mapping descriptions">
-              <p class="helper-text"><strong>Density:</strong> darker areas create more marks while line width stays mostly fixed.</p>
-              <p class="helper-text"><strong>Stroke:</strong> darker areas create thicker lines with fewer changes in mark count.</p>
-              <p class="helper-text"><strong>Hybrid:</strong> darker areas use both more marks and thicker lines.</p>
-            </div>
-
-            <div class="field-row">
-              <label class="field">
-                <span>Gamma</span>
-                <span class="field-label">Gamma <span id="gammaValue" class="field-value">1.00</span></span>
-                <input id="gamma" type="range" min="0.4" max="2.4" step="0.05" value="1" data-value-target="gammaValue" data-value-decimals="2" />
-                <span class="helper-text">Shifts midtones brighter or darker without changing black and white extremes as much.</span>
-              </label>
-              <label class="field">
-                <span>Contrast</span>
-                <span class="field-label">Contrast <span id="contrastValue" class="field-value">0</span></span>
-                <input id="contrast" type="range" min="-60" max="60" step="1" value="0" data-value-target="contrastValue" data-value-decimals="0" />
-                <span class="helper-text">Increases or softens separation between light and dark areas before shapes are generated.</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="control-group">
-            <div class="control-group__header">
-              <h3>Geometry Density</h3>
-              <p>Adjust sampling resolution and how much geometry appears in darker regions.</p>
-            </div>
-
-            <label class="field">
-              <span class="field-label">Cell Size (mm) <span id="cellSizeMmValue" class="field-value">3.0 mm</span></span>
-              <input id="cellSizeMm" type="range" min="1" max="10" step="0.5" value="3" data-value-target="cellSizeMmValue" data-value-decimals="1" data-value-suffix=" mm" />
-              <span class="helper-text">Controls the sampling grid size. Smaller cells capture more detail; larger cells create a simpler, looser drawing.</span>
-            </label>
-
-            <label class="field control-visibility" data-visible-when="mapping:hybrid|density">
-              <span class="field-label">Density Strength <span id="densityStrengthValue" class="field-value">0.70</span></span>
-              <input id="densityStrength" type="range" min="0" max="1" step="0.05" value="0.7" data-value-target="densityStrengthValue" data-value-decimals="2" />
-              <span class="helper-text">Controls how strongly dark areas add extra marks. Higher values increase visual weight and plotting complexity.</span>
-            </label>
-          </div>
-
-          <div class="control-group">
-            <div class="control-group__header">
-              <h3>Shape Language</h3>
-              <p>Pick the geometric vocabulary and the rule used to assign forms across the image.</p>
-            </div>
-
-            <div class="mapping-help" aria-label="Shape language descriptions">
-              <p class="helper-text"><strong>Single Shape:</strong> uses one selected shape for every mark.</p>
-              <p class="helper-text"><strong>Intensity Bands:</strong> switches shape based on whether an area is dark, midtone, or light.</p>
-              <p class="helper-text"><strong>Seeded Random:</strong> mixes enabled shapes in a repeatable random pattern.</p>
-            </div>
-
-            <div class="field-row">
-              <label class="field">
-                <span>Style Mode</span>
-                <select id="styleMode">
-                  <option value="single">Single Shape</option>
-                  <option value="banded">Intensity Bands</option>
-                  <option value="random" selected>Seeded Random</option>
-                </select>
-                <span class="helper-text">Chooses how shapes are assigned across the image.</span>
-              </label>
-              <label class="field control-visibility" data-visible-when="style:random">
-                <span>Seed</span>
-                <input id="seed" type="number" step="1" value="42" />
-                <span class="helper-text">Keeps random shape placement repeatable so the same settings produce the same result.</span>
-              </label>
-            </div>
-
-            <fieldset class="field section-fieldset control-visibility" data-visible-when="style:random">
-              <legend>Available Shapes</legend>
-              <div id="availableShapes" class="check-grid"></div>
-              <p class="helper-text">Choose which shapes can appear when using Seeded Random mode.</p>
-            </fieldset>
-
-            <div class="field-row control-visibility" data-visible-when="style:single">
-              <label class="field">
-                <span>Single Shape</span>
-                <select id="singleShape" data-default-shape="circle"></select>
-                <span class="helper-text">Selects the one shape used everywhere in Single Shape mode.</span>
-              </label>
-            </div>
-
-            <div class="field-stack control-visibility" data-visible-when="style:banded">
-              <label class="field">
-                <span>Dark Band Shape</span>
-                <select id="bandDark" data-default-shape="square"></select>
-                <span class="helper-text">Used in the darkest parts of the image.</span>
-              </label>
-              <label class="field">
-                <span>Mid Band Shape</span>
-                <select id="bandMid" data-default-shape="circle"></select>
-                <span class="helper-text">Used in the midtone range.</span>
-              </label>
-              <label class="field">
-                <span>Light Band Shape</span>
-                <select id="bandLight" data-default-shape="hexagon"></select>
-                <span class="helper-text">Used in the lightest visible areas.</span>
-              </label>
+              <div class="field-stack control-visibility" data-visible-when="style:banded">
+                <label class="field">
+                  <span>Dark Band Shape</span>
+                  <select id="bandDark" data-default-shape="square"></select>
+                  <span class="helper-text">Used in the darkest parts of the image.</span>
+                </label>
+                <label class="field">
+                  <span>Mid Band Shape</span>
+                  <select id="bandMid" data-default-shape="circle"></select>
+                  <span class="helper-text">Used in the midtone range.</span>
+                </label>
+                <label class="field">
+                  <span>Light Band Shape</span>
+                  <select id="bandLight" data-default-shape="hexagon"></select>
+                  <span class="helper-text">Used in the lightest visible areas.</span>
+                </label>
+              </div>
             </div>
           </div>
 
@@ -228,6 +269,7 @@
               <div class="preview-surface">
                 <div id="svgPreview" class="svg-preview"></div>
               </div>
+              <ul id="previewLayerSummary" class="preview-layer-summary"></ul>
             </div>
           </div>
         </section>
