@@ -17,8 +17,8 @@ const invertInput = document.getElementById("invert");
 const gammaInput = document.getElementById("gamma");
 const contrastInput = document.getElementById("contrast");
 const densityStrengthInput = document.getElementById("densityStrength");
-const strokeMinInput = document.getElementById("strokeMin");
-const strokeMaxInput = document.getElementById("strokeMax");
+const toolProfileInput = document.getElementById("toolProfile");
+const toolProfileDetailsEl = document.getElementById("toolProfileDetails");
 const singleShapeInput = document.getElementById("singleShape");
 const seedInput = document.getElementById("seed");
 const bandDarkInput = document.getElementById("bandDark");
@@ -32,14 +32,19 @@ const grayscaleCanvas = document.getElementById("grayscaleCanvas");
 const grayscaleCtx = grayscaleCanvas.getContext("2d", { willReadFrequently: true });
 const svgPreview = document.getElementById("svgPreview");
 const conditionalControls = [...document.querySelectorAll(".control-visibility")];
+const rangeInputs = [...document.querySelectorAll('input[type="range"][data-value-target]')];
 const shapeRegistry = Array.isArray(window.PhotoPlottoShapes) ? window.PhotoPlottoShapes : [];
 const shapeMap = new Map(shapeRegistry.map((shape) => [shape.id, shape]));
+const toolRegistry = Array.isArray(window.PhotoPlottoTools) ? window.PhotoPlottoTools : [];
+const toolMap = new Map(toolRegistry.map((tool) => [tool.id, tool]));
 
 let loadedImageBitmap = null;
 let workingImageData = null;
 let lastSvg = "";
 
 initializeShapeControls();
+initializeToolControls();
+initializeRangeValueDisplays();
 
 imageInput.addEventListener("change", async (event) => {
   const [file] = event.target.files;
@@ -63,8 +68,13 @@ imageInput.addEventListener("change", async (event) => {
   if (control === imageInput) {
     return;
   }
+
   control.addEventListener("input", () => {
+    if (control instanceof HTMLInputElement && control.type === "range") {
+      updateRangeValueDisplay(control);
+    }
     syncControlVisibility();
+    updateToolProfileDetails();
     if (!loadedImageBitmap) {
       return;
     }
@@ -73,6 +83,7 @@ imageInput.addEventListener("change", async (event) => {
 });
 
 syncControlVisibility();
+updateToolProfileDetails();
 
 renderBtn.addEventListener("click", () => {
   renderPipeline();
@@ -96,6 +107,24 @@ function setStatus(message) {
   statusEl.textContent = message;
 }
 
+function initializeRangeValueDisplays() {
+  for (const input of rangeInputs) {
+    updateRangeValueDisplay(input);
+  }
+}
+
+function updateRangeValueDisplay(input) {
+  const targetId = input.dataset.valueTarget;
+  const target = targetId ? document.getElementById(targetId) : null;
+  if (!target) {
+    return;
+  }
+
+  const decimals = Number.parseInt(input.dataset.valueDecimals || "0", 10);
+  const suffix = input.dataset.valueSuffix || "";
+  target.textContent = `${Number(input.value).toFixed(decimals)}${suffix}`;
+}
+
 function initializeShapeControls() {
   if (!shapeRegistry.length) {
     throw new Error("PhotoPlottoShapes registry is empty.");
@@ -106,6 +135,23 @@ function initializeShapeControls() {
   populateShapeSelect(bandDarkInput);
   populateShapeSelect(bandMidInput);
   populateShapeSelect(bandLightInput);
+}
+
+function initializeToolControls() {
+  if (!toolRegistry.length) {
+    throw new Error("PhotoPlottoTools registry is empty.");
+  }
+
+  const defaultToolId = resolveToolId(toolProfileInput.dataset.defaultTool);
+  toolProfileInput.innerHTML = "";
+
+  for (const tool of toolRegistry) {
+    const option = document.createElement("option");
+    option.value = tool.id;
+    option.textContent = tool.label;
+    option.selected = tool.id === defaultToolId;
+    toolProfileInput.append(option);
+  }
 }
 
 function renderAvailableShapes() {
@@ -171,6 +217,20 @@ function renderPipeline() {
   exportBtn.disabled = false;
 }
 
+function updateToolProfileDetails() {
+  const tool = getSelectedToolProfile();
+  if (!tool || !toolProfileDetailsEl) {
+    return;
+  }
+
+  const cellSize = Math.max(0.8, Number(cellSizeMmInput.value) || 3);
+  const compatibility = cellSize < tool.recommendedCellSizeMm
+    ? `Cell size ${fmt(cellSize)}mm is tighter than the recommended ${fmt(tool.recommendedCellSizeMm)}mm for this tool.`
+    : `Cell size ${fmt(cellSize)}mm is compatible with this tool.`;
+
+  toolProfileDetailsEl.textContent = `${tool.notes} Tip ${fmt(tool.tipWidthMm)}mm. Stroke range ${fmt(tool.minStrokeMm)}-${fmt(tool.maxStrokeMm)}mm. ${compatibility}`;
+}
+
 function syncControlVisibility() {
   const mappingMode = mappingModeInput.value;
   const styleMode = styleModeInput.value;
@@ -205,6 +265,8 @@ function matchesVisibilityRule(rule, state) {
 }
 
 function readParams() {
+  const toolProfile = getSelectedToolProfile();
+
   return {
     pageSize: pageSizeInput.value,
     pageOrientation: pageOrientationInput.value,
@@ -212,15 +274,17 @@ function readParams() {
     borderEnabled: borderEnabledInput.checked,
     borderInsetMm: Math.max(0, Number(borderInsetMmInput.value) || 0),
     borderStrokeMm: Math.max(0.05, Number(borderStrokeMmInput.value) || 0.35),
-    mappingMode: mappingModeInput.value,
+    mappingMode: mappingModeInput.value || "density",
     styleMode: styleModeInput.value,
     cellSizeMm: Math.max(0.8, Number(cellSizeMmInput.value) || 3),
     invert: invertInput.checked,
     gamma: Math.max(0.2, Number(gammaInput.value) || 1),
     contrast: Number(contrastInput.value) || 0,
     densityStrength: Math.min(1, Math.max(0, Number(densityStrengthInput.value) || 0.7)),
-    strokeMin: Math.max(0.05, Number(strokeMinInput.value) || 0.12),
-    strokeMax: Math.max(0.1, Number(strokeMaxInput.value) || 0.6),
+    toolProfileId: toolProfile.id,
+    toolTipWidthMm: toolProfile.tipWidthMm,
+    strokeMin: toolProfile.minStrokeMm,
+    strokeMax: toolProfile.maxStrokeMm,
     singleShape: resolveShapeId(singleShapeInput.value),
     seed: Number(seedInput.value) || 42,
     bandDark: resolveShapeId(bandDarkInput.value),
@@ -411,10 +475,10 @@ function getStrokeWidth(params, darkness) {
   const minWidth = Math.min(params.strokeMin, params.strokeMax);
   const maxWidth = Math.max(params.strokeMin, params.strokeMax);
   if (params.mappingMode === "density") {
-    return minWidth;
+    return Math.max(minWidth, params.toolTipWidthMm || minWidth);
   }
 
-  return minWidth + (maxWidth - minWidth) * darkness;
+  return Math.max(minWidth + (maxWidth - minWidth) * darkness, params.toolTipWidthMm || minWidth);
 }
 
 function buildShapeSvg(shapeType, cx, cy, size, strokeWidth, opacity) {
@@ -441,6 +505,39 @@ function resolveShapeId(shapeId) {
   }
 
   return getDefaultShapeId();
+}
+
+function getDefaultToolId() {
+  if (toolMap.has("01-liner")) {
+    return "01-liner";
+  }
+
+  return toolRegistry[0]?.id || "";
+}
+
+function resolveToolId(toolId) {
+  if (toolId && toolMap.has(toolId)) {
+    return toolId;
+  }
+
+  return getDefaultToolId();
+}
+
+function getSelectedToolProfile() {
+  const tool = toolMap.get(resolveToolId(toolProfileInput.value));
+  if (tool) {
+    return tool;
+  }
+
+  return {
+    id: "default-tool",
+    label: "Default Tool",
+    tipWidthMm: 0.1,
+    minStrokeMm: 0.12,
+    maxStrokeMm: 0.35,
+    recommendedCellSizeMm: 2,
+    notes: "Fallback tool profile."
+  };
 }
 
 function getContrastFactor(contrast) {

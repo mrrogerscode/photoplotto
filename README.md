@@ -26,6 +26,7 @@ This is intended to work after cloning the repo and opening the file from disk, 
 
 - `index.html`: App shell and controls UI.
 - `shapes.js`: Shape registry loaded before the main app script.
+- `tools.js`: Tool profile registry for plotter-friendly stroke behavior.
 - `shapes/`: Normalized SVG assets for built-in shapes.
 - `styles.css`: Visual design and responsive layout.
 - `app.js`: Image processing, geometry mapping, and SVG generation pipeline.
